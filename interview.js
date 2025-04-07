@@ -827,4 +827,4 @@ customElements.define('page-component', PageComponent);
 customElements.define('editable-text', EditableText);
 export {EditableText, PageComponent, MyShadowComponent, EncoderComponent, QRScanner, CustomCheckboxGroup
     , DirectoryExplorer, EmojiKanji, VoiceSelector, SpeechListener
-};
+};  
