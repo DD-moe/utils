@@ -711,10 +711,11 @@ class SpeechListener extends HTMLElement {
     }
     
      async askAI(){
+        this.stopListening();
         const gemini_model = document.getElementById(this.getAttribute('AI'));
-      const instruction = this.getAttribute('instruction');
-      const instr = document.getElementById(instruction).value;
-      const response = await gemini_model.generate(this.textarea.value, instr)
+        const instruction = this.getAttribute('instruction');
+        const instr = document.getElementById(instruction).value;
+        const response = await gemini_model.generate(this.textarea.value, instr)
         this.voice.speak(response);
     }
 }
