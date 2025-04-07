@@ -723,6 +723,8 @@ class SpeechListener extends HTMLElement {
 
 
 class VoiceSelector extends HTMLElement {
+    static instances = [];
+
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
@@ -749,8 +751,8 @@ class VoiceSelector extends HTMLElement {
         this.voiceSelect.addEventListener('change', () => this.selectVoice());
         this.stopButton.addEventListener('click', () => speechSynthesis.cancel());
 
-        // Przygotowanie głosów po ich załadowaniu
-        window.speechSynthesis.onvoiceschanged = () => this.loadVoices();
+        // Zapisz instancję
+        VoiceSelector.instances.push(this);
     }
 
     connectedCallback() {
@@ -758,11 +760,19 @@ class VoiceSelector extends HTMLElement {
         this.loadVoices();
     }
 
+    disconnectedCallback() {
+        // Usuń instancję przy odmontowaniu
+        VoiceSelector.instances = VoiceSelector.instances.filter(i => i !== this);
+    }
+
+    static globalVoicesChanged() {
+        VoiceSelector.instances.forEach(instance => instance.loadVoices());
+    }
+
     loadVoices() {
         this.voices = speechSynthesis.getVoices();
         const languages = [...new Set(this.voices.map(v => v.lang))].sort();
 
-        // Nie resetuj, jeśli już załadowane
         if (this.langSelect.options.length === languages.length) return;
 
         this.langSelect.innerHTML = '';
@@ -794,7 +804,6 @@ class VoiceSelector extends HTMLElement {
             this.voiceSelect.appendChild(opt);
         });
 
-        // Przywróć poprzednio wybrany głos, jeśli dalej istnieje
         const sameVoice = [...this.voiceSelect.options].find(opt => opt.value === prevSelectedVoiceName);
         if (sameVoice) {
             this.voiceSelect.value = prevSelectedVoiceName;
@@ -812,9 +821,15 @@ class VoiceSelector extends HTMLElement {
         if (!this.selectedVoice || !text) return;
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.voice = this.selectedVoice;
-        speechSynthesis.cancel(); // zatrzymaj wcześniejsze
+        speechSynthesis.cancel();
         speechSynthesis.speak(utterance);
     }
+}
+
+// Tylko raz zarejestruj globalny listener
+if (!window._voiceSelectorVoicesListenerRegistered) {
+    window.speechSynthesis.onvoiceschanged = () => VoiceSelector.globalVoicesChanged();
+    window._voiceSelectorVoicesListenerRegistered = true;
 }
 
 customElements.define('voice-selector', VoiceSelector);
