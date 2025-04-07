@@ -611,7 +611,195 @@ class EmojiKanji extends HTMLElement {
     }
 }
 
+class SpeechListener extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: 'open' });
+  
+      this.shadowRoot.innerHTML = `
+        <style>
+          :host {
+            display: block;
+            font-family: sans-serif;
+          }
+  
+          .container {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+          }
+  
+          textarea {
+            width: 100%;
+            height: 100px;
+            resize: none;
+            margin-bottom: 10px;
+          }
+  
+          button {
+            font-size: 1.5rem;
+            cursor: pointer;
+          }
+        </style>
+  
+        <textarea part="output"></textarea>
+        <div class="container" part="controls">
+          <button id="start" title="Start listening">🟢</button>
+          <button id="stop" title="Stop listening">🔴</button>
+          <button id="clear" title="Clear text">⚫</button>
+          <button id="ask" title="Ask model">❓</button>
+          <voice-selector id="voice" language="pl-PL"></voice-selector>
+        </div>
+      `;
+  
+      this.textarea = this.shadowRoot.querySelector('textarea');
+      this.startBtn = this.shadowRoot.getElementById('start');
+      this.stopBtn = this.shadowRoot.getElementById('stop');
+      this.clearBtn = this.shadowRoot.getElementById('clear');
+      this.ask = this.shadowRoot.getElementById('ask');
+      this.voice = this.shadowRoot.getElementById('voice');
+  
+      // Try to initialize recognition
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        this.recognition = new SpeechRecognition();
+        this.recognition.lang = 'pl-PL';
+        this.recognition.continuous = true;
+        this.recognition.interimResults = false;
+  
+        this.recognition.onresult = (event) => {
+          const lastResult = event.results[event.results.length - 1];
+          if (lastResult.isFinal) {
+            const text = lastResult[0].transcript.trim();
+            this.textarea.value += text + '\n';
+          }
+        };
+  
+        this.recognition.onerror = (e) => {
+          console.warn('Speech recognition error:', e);
+        };
+  
+        this.recognition.onend = () => {
+          console.log('Recognition ended');
+        };
+      } else {
+        this.startBtn.disabled = true;
+        this.stopBtn.disabled = true;
+        this.textarea.value = 'Web Speech API nie jest obsługiwane w tej przeglądarce.';
+      }
+  
+      this.startBtn.addEventListener('click', () => this.startListening());
+      this.stopBtn.addEventListener('click', () => this.stopListening());
+      this.clearBtn.addEventListener('click', () => this.clearTextarea());
+      this.ask.addEventListener('click', () => this.askAI());
+    }
+  
+    startListening() {
+      if (this.recognition) {
+        this.recognition.start();
+      }
+    }
+  
+    stopListening() {
+      if (this.recognition) {
+        this.recognition.stop();
+      }
+    }
+    
+    clearTextarea(){
+        this.textarea.value = '';
+    }
+    
+     async askAI(){
+        const gemini_model = document.getElementById(this.getAttribute('AI'));
+      const instruction = this.getAttribute('instruction');
+      const instr = document.getElementById(instruction).value;
+      const response = await gemini_model.generate(this.textarea.value, instr)
+        this.voice.speak(response);
+    }
+}
+
+
+class VoiceSelector extends HTMLElement {
+    constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+
+        this.shadowRoot.innerHTML = `
+            <style>
+                select { margin: 4px; padding: 4px; }
+            </style>
+            <label>Język: <select id="langSelect"></select></label>
+            <label>Głos: <select id="voiceSelect"></select></label>
+        `;
+
+        this.langSelect = this.shadowRoot.querySelector('#langSelect');
+        this.voiceSelect = this.shadowRoot.querySelector('#voiceSelect');
+        this.voices = [];
+
+        this.langSelect.addEventListener('change', () => this.updateVoices());
+        this.voiceSelect.addEventListener('change', () => this.selectVoice());
+
+        // Przygotowanie głosów po ich załadowaniu
+        window.speechSynthesis.onvoiceschanged = () => this.loadVoices();
+    }
+
+    connectedCallback() {
+        // Ustaw domyślny język z atrybutu
+        this.defaultLanguage = this.getAttribute('language') || 'pl-PL';
+        this.loadVoices();
+    }
+
+    loadVoices() {
+        this.voices = speechSynthesis.getVoices();
+        const languages = [...new Set(this.voices.map(v => v.lang))].sort();
+
+        this.langSelect.innerHTML = '';
+        languages.forEach(lang => {
+            const opt = document.createElement('option');
+            opt.value = lang;
+            opt.textContent = lang;
+            this.langSelect.appendChild(opt);
+        });
+
+        // Wybierz domyślny język jeśli dostępny
+        const defaultOption = [...this.langSelect.options].find(opt => opt.value === this.defaultLanguage);
+        if (defaultOption) {
+            this.langSelect.value = this.defaultLanguage;
+        }
+
+        this.updateVoices();
+    }
+
+    updateVoices() {
+        const selectedLang = this.langSelect.value;
+        const filteredVoices = this.voices.filter(v => v.lang === selectedLang);
+        this.voiceSelect.innerHTML = '';
+        filteredVoices.forEach(voice => {
+            const opt = document.createElement('option');
+            opt.value = voice.name;
+            opt.textContent = `${voice.name} (${voice.lang})`;
+            this.voiceSelect.appendChild(opt);
+        });
+        this.selectVoice();
+    }
+
+    selectVoice() {
+        const voiceName = this.voiceSelect.value;
+        this.selectedVoice = this.voices.find(v => v.name === voiceName);
+    }
+
+    speak(text) {
+        if (!this.selectedVoice) return;
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.voice = this.selectedVoice;
+        speechSynthesis.speak(utterance);
+    }
+}
+
 // Rejestracja niestandardowego elementu HTML
+customElements.define('voice-selector', VoiceSelector);
+customElements.define('speech-listener', SpeechListener);
 customElements.define('emoji-kanji', EmojiKanji);
 customElements.define('directory-explorer', DirectoryExplorer);
 customElements.define('custom-checkbox-group', CustomCheckboxGroup);
