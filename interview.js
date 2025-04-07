@@ -697,6 +697,7 @@ class SpeechListener extends HTMLElement {
   
     startListening() {
       if (this.recognition) {
+        this.textarea.value += `\nUżytkownik: `;
         this.recognition.start();
       }
     }
@@ -717,6 +718,7 @@ class SpeechListener extends HTMLElement {
         const instruction = this.getAttribute('instruction');
         const instr = document.getElementById(instruction).value;
         const response = await gemini_model.generate(this.textarea.value, instr)
+        this.textarea.value += `\n${this.getAttribute('speaker')}: ${response}`;
         this.voice.speak(response);
     }
 }
