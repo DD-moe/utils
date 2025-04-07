@@ -627,6 +627,7 @@ class SpeechListener extends HTMLElement {
             display: flex;
             gap: 10px;
             margin-top: 10px;
+            flex-wrap: wrap;
           }
   
           textarea {
