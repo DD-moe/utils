@@ -727,25 +727,31 @@ class VoiceSelector extends HTMLElement {
 
         this.shadowRoot.innerHTML = `
             <style>
-                select { margin: 4px; padding: 4px; }
+                select, button {
+                    margin: 4px;
+                    padding: 4px;
+                    font-size: 1em;
+                }
             </style>
             <label>Język: <select id="langSelect"></select></label>
             <label>Głos: <select id="voiceSelect"></select></label>
+            <button id="stopButton" title="Zatrzymaj mówienie">⏹️</button>
         `;
 
         this.langSelect = this.shadowRoot.querySelector('#langSelect');
         this.voiceSelect = this.shadowRoot.querySelector('#voiceSelect');
+        this.stopButton = this.shadowRoot.querySelector('#stopButton');
         this.voices = [];
 
         this.langSelect.addEventListener('change', () => this.updateVoices());
         this.voiceSelect.addEventListener('change', () => this.selectVoice());
+        this.stopButton.addEventListener('click', () => speechSynthesis.cancel());
 
         // Przygotowanie głosów po ich załadowaniu
         window.speechSynthesis.onvoiceschanged = () => this.loadVoices();
     }
 
     connectedCallback() {
-        // Ustaw domyślny język z atrybutu
         this.defaultLanguage = this.getAttribute('language') || 'pl-PL';
         this.loadVoices();
     }
@@ -753,6 +759,9 @@ class VoiceSelector extends HTMLElement {
     loadVoices() {
         this.voices = speechSynthesis.getVoices();
         const languages = [...new Set(this.voices.map(v => v.lang))].sort();
+
+        // Nie resetuj, jeśli już załadowane
+        if (this.langSelect.options.length === languages.length) return;
 
         this.langSelect.innerHTML = '';
         languages.forEach(lang => {
@@ -762,7 +771,6 @@ class VoiceSelector extends HTMLElement {
             this.langSelect.appendChild(opt);
         });
 
-        // Wybierz domyślny język jeśli dostępny
         const defaultOption = [...this.langSelect.options].find(opt => opt.value === this.defaultLanguage);
         if (defaultOption) {
             this.langSelect.value = this.defaultLanguage;
@@ -774,6 +782,8 @@ class VoiceSelector extends HTMLElement {
     updateVoices() {
         const selectedLang = this.langSelect.value;
         const filteredVoices = this.voices.filter(v => v.lang === selectedLang);
+        const prevSelectedVoiceName = this.voiceSelect.value;
+
         this.voiceSelect.innerHTML = '';
         filteredVoices.forEach(voice => {
             const opt = document.createElement('option');
@@ -781,6 +791,13 @@ class VoiceSelector extends HTMLElement {
             opt.textContent = `${voice.name} (${voice.lang})`;
             this.voiceSelect.appendChild(opt);
         });
+
+        // Przywróć poprzednio wybrany głos, jeśli dalej istnieje
+        const sameVoice = [...this.voiceSelect.options].find(opt => opt.value === prevSelectedVoiceName);
+        if (sameVoice) {
+            this.voiceSelect.value = prevSelectedVoiceName;
+        }
+
         this.selectVoice();
     }
 
@@ -790,14 +807,14 @@ class VoiceSelector extends HTMLElement {
     }
 
     speak(text) {
-        if (!this.selectedVoice) return;
+        if (!this.selectedVoice || !text) return;
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.voice = this.selectedVoice;
+        speechSynthesis.cancel(); // zatrzymaj wcześniejsze
         speechSynthesis.speak(utterance);
     }
 }
 
-// Rejestracja niestandardowego elementu HTML
 customElements.define('voice-selector', VoiceSelector);
 customElements.define('speech-listener', SpeechListener);
 customElements.define('emoji-kanji', EmojiKanji);
@@ -809,5 +826,5 @@ customElements.define('my-shadow-component', MyShadowComponent);
 customElements.define('page-component', PageComponent);
 customElements.define('editable-text', EditableText);
 export {EditableText, PageComponent, MyShadowComponent, EncoderComponent, QRScanner, CustomCheckboxGroup
-    , DirectoryExplorer, EmojiKanji
+    , DirectoryExplorer, EmojiKanji, VoiceSelector, SpeechListener
 };
