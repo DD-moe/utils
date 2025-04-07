@@ -825,7 +825,7 @@ class VoiceSelector extends HTMLElement {
         speechSynthesis.speak(utterance);
     }
 }
-
+ 
 // Tylko raz zarejestruj globalny listener
 if (!window._voiceSelectorVoicesListenerRegistered) {
     window.speechSynthesis.onvoiceschanged = () => VoiceSelector.globalVoicesChanged();
