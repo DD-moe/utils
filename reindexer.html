@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <title>Reindeksator Referencji</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 20px auto; padding: 0 20px; line-height: 1.6; }
+        textarea { width: 100%; height: 120px; margin-bottom: 10px; display: block; }
+        input[type="text"] { width: 100%; padding: 8px; margin-bottom: 15px; box-sizing: border-box; }
+        label { font-weight: bold; display: block; margin-top: 15px; }
+        button { padding: 10px 20px; cursor: pointer; background: #007BFF; color: white; border: none; border-radius: 4px; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        hr { margin: 25px 0; border: 0; border-top: 1px solid #ccc; }
+        .output { background: #f9f9f9; border: 1px dashed #aaa; }
+    </style>
+</head>
+<body>
+
+    <h2>Reindeksator Referencji</h2>
+
+    <label for="refList">Lista referencji (źródłowa):</label>
+    <textarea id="refList" placeholder="Wklej tutaj listę bibliograficzną..."></textarea>
+
+    <label for="separator">Separator referencji (np. znak nowej linii lub średnik):</label>
+    <input type="text" id="separator" value="\n" placeholder="Użyj \n dla nowej linii">
+
+    <hr>
+
+    <label for="articleText">String z artykułem:</label>
+    <textarea id="articleText" placeholder="Wklej treść artykułu z odnośnikami typu [12]..."></textarea>
+
+    <label for="pattern">Pattern odnośnika (Regex):</label>
+    <input type="text" id="pattern" value="\[(\d+)\]" placeholder="np. \[(\d+)\] dla [12]">
+
+    <hr>
+
+    <button onclick="processReferences()">Przetwórz</button>
+
+    <label for="outputArticle">Zmodyfikowany artykuł (nowa kolejność):</label>
+    <textarea id="outputArticle" class="output" readonly></textarea>
+
+    <label for="outputRefs">Uporządkowana lista referencji (podwójny newline):</label>
+    <textarea id="outputRefs" class="output" readonly></textarea>
+
+    <script>
+        function processReferences() {
+            const refListRaw = document.getElementById('refList').value;
+            let sep = document.getElementById('separator').value;
+            // Obsługa escapowania znaku nowej linii
+            if (sep === "\\n") sep = "\n";
+            
+            const articleText = document.getElementById('articleText').value;
+            const patternStr = document.getElementById('pattern').value;
+            const regex = new RegExp(patternStr, 'g');
+
+            // 1. Podział listy referencji na tablicę (index 0 to stara ref [1])
+            const sourceRefs = refListRaw.split(sep).map(s => s.trim()).filter(s => s !== "");
+
+            // 2. Znalezienie wszystkich unikalnych odnośników w tekście w kolejności występowania
+            const matches = [...articleText.matchAll(regex)];
+            const uniqueOldIndices = [];
+            matches.forEach(match => {
+                const oldIndex = parseInt(match[1]);
+                if (!uniqueOldIndices.includes(oldIndex)) {
+                    uniqueOldIndices.push(oldIndex);
+                }
+            });
+
+            // 3. Stworzenie mapy: stary numer -> nowy numer i nowa lista ref
+            const oldToNewMap = {};
+            const newRefList = [];
+
+            uniqueOldIndices.forEach((oldIdx, i) => {
+                const newIdx = i + 1;
+                oldToNewMap[oldIdx] = newIdx;
+                // Pobieramy treść referencji (tablica jest 0-indexowana, więc oldIdx-1)
+                newRefList.push(sourceRefs[oldIdx - 1] || `Brak opisu dla ref [${oldIdx}]`);
+            });
+
+            // 4. Podmiana numeracji w tekście
+            const newArticle = articleText.replace(regex, (match, oldIdx) => {
+                return `[${oldToNewMap[parseInt(oldIdx)]}]`;
+            });
+
+            // 5. Wyświetlenie wyników
+            document.getElementById('outputArticle').value = newArticle;
+            document.getElementById('outputRefs').value = newRefList.join('\n\n');
+        }
+    </script>
+
+</body>
+</html>
