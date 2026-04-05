@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wyszukiwarka Połączeń Roślin</title>
+    <style>
+        :root {
+            --primary: #2e7d32;
+            --primary-dark: #1b5e20;
+            --danger: #d32f2f;
+            --bg-color: #fafafa;
+            --panel-bg: #fff;
+            --border-color: #ddd;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            line-height: 1.6;
+            background-color: var(--bg-color);
+            color: #333;
+        }
+
+        h2 { color: var(--primary); }
+        
+        .control-group {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        input[type="text"], input[type="number"], select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-top: 5px;
+            margin-right: 5px;
+        }
+
+        button {
+            padding: 8px 15px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background-color: var(--primary-dark); }
+        button.btn-danger { background-color: var(--danger); }
+        button.btn-danger:hover { background-color: #b71c1c; }
+        button.btn-secondary { background-color: #555; }
+        button.btn-secondary:hover { background-color: #333; }
+
+        .explanation-box {
+            background-color: #e8f5e9;
+            border-left: 4px solid var(--primary);
+            padding: 10px 15px;
+            margin: 15px 0;
+            font-size: 0.9em;
+            border-radius: 0 4px 4px 0;
+        }
+
+        /* Lista roślin */
+        #selected-plants-list { padding-left: 0; list-style: none; }
+        #selected-plants-list li {
+            display: flex; justify-content: space-between; align-items: center;
+            background: var(--panel-bg); border: 1px solid var(--border-color);
+            padding: 6px 12px; margin-bottom: 6px; border-radius: 4px;
+        }
+        .remove-btn { background-color: transparent; color: var(--danger); padding: 0 5px; font-size: 1.1em; }
+        .remove-btn:hover { background-color: transparent; color: #b71c1c; }
+
+        /* Lista wyników */
+        #results-list { padding-left: 0; list-style: none; }
+        .combo-item {
+            background: var(--panel-bg); border: 1px solid var(--border-color);
+            padding: 15px; margin-bottom: 15px; border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .combo-title { font-weight: bold; font-size: 1.15em; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .combo-details { margin-left: 5px; font-size: 0.95em; }
+        .interaction-positive { color: var(--primary); margin-bottom: 2px; }
+        .interaction-neutral { color: #000; margin-bottom: 2px; }
+
+        /* Panel Edycji Bazy */
+        #edit-panel {
+            display: none;
+            margin-top: 30px;
+            padding: 20px;
+            background: #f0f0f0;
+            border: 2px dashed #bbb;
+            border-radius: 8px;
+        }
+        .file-controls { margin-bottom: 15px; display: flex; gap: 10px; align-items: center; }
+        .file-controls input[type="file"] { display: none; }
+
+        /* Tabela danych z zablokowanym nagłówkiem i scrollem */
+        .table-container {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: white;
+            margin-bottom: 15px;
+        }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th, td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+        th { 
+            position: sticky; 
+            top: 0; 
+            background-color: var(--primary); 
+            color: white; 
+            z-index: 1;
+        }
+        td button { padding: 4px 8px; font-size: 0.85em; }
+
+        .add-form {
+            display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;
+            background: #fff; padding: 15px; border-radius: 4px; border: 1px solid var(--border-color);
+        }
+        .add-form div { display: flex; flex-direction: column; }
+    </style>
+</head>
+<body>
+
+    <h2>Dobroczynne Połączenia Roślin</h2>
+
+    <div class="control-group">
+        <label for="plant-input">Dodaj roślinę do sprawdzenia:</label><br>
+        <input type="text" id="plant-input" list="plants-datalist" placeholder="Zacznij wpisywać...">
+        <datalist id="plants-datalist"></datalist>
+        <button onclick="addPlant()">Dodaj do listy</button>
+    </div>
+
+    <h4>Wybrane rośliny do analizy:</h4>
+    <ul id="selected-plants-list"></ul>
+
+    <div class="control-group">
+        <label for="group-size">Wielkość subgrupy (2-5): </label>
+        <input type="number" id="group-size" min="2" max="5" value="3">
+        <button onclick="findCombinations()">Szukaj połączeń</button>
+
+        <div class="explanation-box">
+            <strong>Czym jest subgrupa?</strong> Zespół roślin posadzonych blisko siebie. Program szuka takich konfiguracji w wybranych roślinach, w których każda roślina wewnątrz grupy ma neutralne lub pozytywne (nigdy negatywne!) relacje z resztą współtowarzyszy, generując przy tym jak najwięcej wzajemnych korzyści.
+        </div>
+    </div>
+
+    <h4>Znalezione najlepsze kombinacje:</h4>
+    <ul id="results-list"></ul>
+
+    <hr style="margin: 30px 0; border: 0; border-top: 1px solid #ddd;">
+
+    <button class="btn-secondary" onclick="toggleEditPanel()" id="toggle-panel-btn">⚙️ Rozwiń panel edycji bazy roślin</button>
+
+    <div id="edit-panel">
+        <h3>Edycja Bazy Danych</h3>
+
+        <div class="file-controls">
+            <button onclick="saveToFile()">📥 Zapisz dane do pliku</button>
+            <button onclick="document.getElementById('file-upload').click()">📂 Wczytaj dane z pliku</button>
+            <input type="file" id="file-upload" accept=".json" onchange="loadFromFile(event)">
+            <button class="btn-danger" onclick="restoreDefaultDB()">🔄 Przywróć domyślną bazę</button>
+        </div>
+
+        <div class="table-container">
+            <table id="data-table">
+                <thead>
+                    <tr>
+                        <th>Roślina 1</th>
+                        <th>Roślina 2</th>
+                        <th>Interakcja</th>
+                        <th>Akcja</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+
+        <div class="add-form">
+            <div>
+                <label>Roślina 1</label>
+                <input type="text" id="new-p1" placeholder="Naza rośliny...">
+            </div>
+            <div>
+                <label>Roślina 2</label>
+                <input type="text" id="new-p2" placeholder="Nazwa rośliny...">
+            </div>
+            <div>
+                <label>Interakcja</label>
+                <select id="new-inter">
+                    <option value="pozytywne">pozytywne</option>
+                    <option value="negatywne">negatywne</option>
+                </select>
+            </div>
+            <button onclick="addCombinationToDB()">Dodaj / Aktualizuj</button>
+        </div>
+    </div>
+
+    <script>
+        // DOMyślne dane awaryjne
+        const rawData = [
+            ["Pomidor", "Bazylia", "pozytywne"],
+            ["Pomidor", "Czosnek", "pozytywne"],
+            ["Pomidor", "Ziemniak", "negatywne"],
+            ["Marchew", "Cebula", "pozytywne"],
+            ["Marchew", "Koper", "pozytywne"],
+            ["Koper", "Czosnek", "negatywne"],
+            ["Kukurydza", "Fasola", "pozytywne"],
+            ["Kukurydza", "Dynia", "pozytywne"],
+            ["Fasola", "Dynia", "pozytywne"], 
+            ["Cebula", "Czosnek", "pozytywne"]
+        ];
+
+        let appData = [];
+        let plantSet = new Set();
+        let interactionMap = new Map();
+        let selectedPlants = []; 
+
+        const STORAGE_KEY = 'KombinacjeRoslin';
+
+        // Funkcja ujednolicająca nazwy (wielka pierwsza litera)
+        function formatName(name) {
+            if (!name) return "";
+            name = name.trim();
+            return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+        }
+
+        function getMapKey(plant1, plant2) {
+            return [plant1, plant2].sort().join('+');
+        }
+
+        // ==========================================
+        // 1. ZARZĄDZANIE DANYMI (INIT, LOCAL STORAGE)
+        // ==========================================
+        
+        function initApp() {
+            const savedData = localStorage.getItem(STORAGE_KEY);
+            if (savedData) {
+                try {
+                    appData = JSON.parse(savedData);
+                } catch (e) {
+                    console.error("Błąd parsowania localStorage. Wczytuję dane domyślne.", e);
+                    appData = [...rawData];
+                }
+            } else {
+                appData = [...rawData];
+                saveToLocalStorage(); // zapisz domyślne do pamięci
+            }
+
+            plantSet.clear();
+            interactionMap.clear();
+
+            appData.forEach(([p1, p2, interaction]) => {
+                plantSet.add(p1);
+                plantSet.add(p2);
+                interactionMap.set(getMapKey(p1, p2), interaction);
+            });
+
+            updateDatalist();
+            renderDataTable();
+            
+            // Usunięcie z list wyboru roślin, które mogły zostać skasowane z bazy
+            selectedPlants = selectedPlants.filter(p => plantSet.has(p));
+            renderSelectedPlants();
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+        }
+
+        // Nasłuchiwanie zmian w pamięci (np. z innej zakładki)
+        window.addEventListener('storage', (e) => {
+            if (e.key === STORAGE_KEY) {
+                initApp();
+            }
+        });
+
+        window.onload = () => {
+            initApp();
+        };
+
+        function updateDatalist() {
+            const datalist = document.getElementById('plants-datalist');
+            datalist.innerHTML = '';
+            Array.from(plantSet).sort().forEach(plant => {
+                const option = document.createElement('option');
+                option.value = plant;
+                datalist.appendChild(option);
+            });
+        }
+
+        // ==========================================
+        // 2. GŁÓWNA APLIKACJA (SZUKANIE)
+        // ==========================================
+
+        function addPlant() {
+            const input = document.getElementById('plant-input');
+            const plant = formatName(input.value);
+
+            if (plant && plantSet.has(plant) && !selectedPlants.includes(plant)) {
+                selectedPlants.push(plant);
+                selectedPlants.sort(); 
+                renderSelectedPlants();
+                input.value = ''; 
+            } else if (!plantSet.has(plant)) {
+                alert("Taka roślina nie występuje w bazie danych.");
+            } else if (selectedPlants.includes(plant)){
+                input.value = ''; 
+            }
+        }
+
+        function removeSelectedPlant(plantToRemove) {
+            selectedPlants = selectedPlants.filter(p => p !== plantToRemove);
+            renderSelectedPlants();
+        }
+
+        function renderSelectedPlants() {
+            const ul = document.getElementById('selected-plants-list');
+            ul.innerHTML = '';
+            selectedPlants.forEach(plant => {
+                const li = document.createElement('li');
+                li.textContent = plant;
+                const btn = document.createElement('button');
+                btn.textContent = '❌';
+                btn.className = 'remove-btn';
+                btn.onclick = () => removeSelectedPlant(plant);
+                li.appendChild(btn);
+                ul.appendChild(li);
+            });
+        }
+
+        function findCombinations() {
+            const sizeInput = document.getElementById('group-size');
+            const maxN = parseInt(sizeInput.value);
+
+            if (isNaN(maxN) || maxN < 2 || maxN > 5) {
+                alert("Proszę podać prawidłową wielkość subgrup, w przedziale od 2 do 5.");
+                sizeInput.value = Math.min(Math.max(maxN, 2), 5) || 3;
+                return;
+            }
+
+            if (selectedPlants.length < 2) {
+                alert("Wybierz co najmniej 2 rośliny z listy wyżej.");
+                return;
+            }
+
+            const resultsByDict = { 2: [], 3: [], 4: [], 5: [] };
+            const allValidGroups = [];
+
+            // Krok 1: Pary
+            const pairs = [];
+            for (let i = 0; i < selectedPlants.length; i++) {
+                for (let j = i + 1; j < selectedPlants.length; j++) {
+                    const p1 = selectedPlants[i];
+                    const p2 = selectedPlants[j];
+                    if (interactionMap.get(getMapKey(p1, p2)) === 'pozytywne') {
+                        pairs.push([p1, p2]);
+                        allValidGroups.push([p1, p2]);
+                    }
+                }
+            }
+            resultsByDict[2] = pairs;
+
+            // Krok 2: Powiększanie grup
+            for (let currentSize = 3; currentSize <= maxN; currentSize++) {
+                const previousGroups = resultsByDict[currentSize - 1];
+                const currentGroupsSet = new Set();
+                const currentGroupsArray = [];
+
+                for (const group of previousGroups) {
+                    for (const plant of selectedPlants) {
+                        if (group.includes(plant)) continue;
+
+                        let hasNegativeInteraction = false;
+                        for (const existingPlant of group) {
+                            if (interactionMap.get(getMapKey(plant, existingPlant)) === 'negatywne') {
+                                hasNegativeInteraction = true;
+                                break;
+                            }
+                        }
+
+                        if (!hasNegativeInteraction) {
+                            const newGroup = [...group, plant].sort();
+                            const newGroupKey = newGroup.join('+');
+
+                            if (!currentGroupsSet.has(newGroupKey)) {
+                                currentGroupsSet.add(newGroupKey);
+                                currentGroupsArray.push(newGroup);
+                                allValidGroups.push(newGroup);
+                            }
+                        }
+                    }
+                }
+                resultsByDict[currentSize] = currentGroupsArray;
+            }
+
+            // Krok 3: Punktacja i Render
+            const scoredGroups = allValidGroups.map(group => {
+                let score = 0;
+                const details = [];
+
+                for (let i = 0; i < group.length; i++) {
+                    for (let j = i + 1; j < group.length; j++) {
+                        const p1 = group[i];
+                        const p2 = group[j];
+                        const interaction = interactionMap.get(getMapKey(p1, p2)) || 'neutralne/nieznane';
+
+                        if (interaction === 'pozytywne') score++;
+                        details.push({ p1, p2, interaction });
+                    }
+                }
+                return { group, score, details };
+            });
+
+            scoredGroups.sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                return b.group.length - a.group.length; 
+            });
+
+            renderResults(scoredGroups);
+        }
+
+        function renderResults(scoredGroups) {
+            const ul = document.getElementById('results-list');
+            ul.innerHTML = '';
+
+            if (scoredGroups.length === 0) {
+                ul.innerHTML = '<li>Brak korzystnych połączeń w wybranych roślinach.</li>';
+                return;
+            }
+
+            scoredGroups.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'combo-item';
+
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'combo-title';
+                titleDiv.textContent = `${item.group.join(' + ')} (Pozytywne zjawiska: ${item.score})`;
+
+                const detailsDiv = document.createElement('div');
+                detailsDiv.className = 'combo-details';
+
+                item.details.forEach(det => {
+                    const detDiv = document.createElement('div');
+                    detDiv.textContent = `• ${det.p1} i ${det.p2}: ${det.interaction}`;
+                    detDiv.className = det.interaction === 'pozytywne' ? 'interaction-positive' : 'interaction-neutral';
+                    detailsDiv.appendChild(detDiv);
+                });
+
+                li.appendChild(titleDiv);
+                li.appendChild(detailsDiv);
+                ul.appendChild(li);
+            });
+        }
+
+        // ==========================================
+        // 3. LOGIKA EDYCJI BAZY (PANEL)
+        // ==========================================
+
+        function toggleEditPanel() {
+            const panel = document.getElementById('edit-panel');
+            const btn = document.getElementById('toggle-panel-btn');
+            if (panel.style.display === 'none' || panel.style.display === '') {
+                panel.style.display = 'block';
+                btn.textContent = '⚙️ Zwiń panel edycji';
+            } else {
+                panel.style.display = 'none';
+                btn.textContent = '⚙️ Rozwiń panel edycji bazy roślin';
+            }
+        }
+
+        function renderDataTable() {
+            const tbody = document.querySelector('#data-table tbody');
+            tbody.innerHTML = '';
+
+            // Sortujemy do widoku po nazwie pierwszej rośliny
+            const sortedData = [...appData].sort((a, b) => a[0].localeCompare(b[0]));
+
+            sortedData.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row[0]}</td>
+                    <td>${row[1]}</td>
+                    <td style="color: ${row[2] === 'pozytywne' ? 'green' : 'red'}">${row[2]}</td>
+                    <td><button class="btn-danger" onclick="deleteCombination('${row[0]}', '${row[1]}')">Usuń</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function deleteCombination(p1, p2) {
+            if(confirm(`Czy na pewno usunąć regułę: ${p1} + ${p2}?`)) {
+                // Filtrujemy dane uwzględniając obie strony medalu (kolejność nie ma znaczenia w Map, ale tu w array ma)
+                const keyToRemove = getMapKey(p1, p2);
+                appData = appData.filter(row => getMapKey(row[0], row[1]) !== keyToRemove);
+                saveAndRefresh();
+            }
+        }
+
+        function addCombinationToDB() {
+            const rawP1 = document.getElementById('new-p1').value;
+            const rawP2 = document.getElementById('new-p2').value;
+            const interaction = document.getElementById('new-inter').value;
+
+            if (!rawP1 || !rawP2) {
+                alert("Proszę wpisać obie rośliny.");
+                return;
+            }
+
+            const p1 = formatName(rawP1);
+            const p2 = formatName(rawP2);
+
+            if (p1 === p2) {
+                alert("Nie można dodać interakcji rośliny z samą sobą.");
+                return;
+            }
+
+            // Ostrzeżenie o potencjalnej literówce
+            if (!plantSet.has(p1) || !plantSet.has(p2)) {
+                const proceed = confirm("Przynajmniej jedna z roślin jest NOWA (nie występuje na liście podpowiedzi). Upewnij się, że nie zrobiłeś literówki. Czy chcesz dodać mimo to?");
+                if (!proceed) return;
+            }
+
+            const key = getMapKey(p1, p2);
+
+            // Sprawdzanie czy kombinacja istnieje
+            if (interactionMap.has(key)) {
+                const existingInter = interactionMap.get(key);
+                if (existingInter !== interaction) {
+                    const proceed = confirm(`Istnieje już połączenie ${p1} i ${p2} opisane jako "${existingInter}". Czy chcesz nadpisać je na "${interaction}"?`);
+                    if (proceed) {
+                        // Aktualizacja w tablicy
+                        appData.forEach(row => {
+                            if (getMapKey(row[0], row[1]) === key) {
+                                row[2] = interaction;
+                            }
+                        });
+                        saveAndRefresh();
+                        clearInputs();
+                    }
+                } else {
+                    alert("Taka relacja dokładnie w tej formie już istnieje w bazie.");
+                }
+            } else {
+                // Dodanie nowej
+                appData.push([p1, p2, interaction]);
+                saveAndRefresh();
+                clearInputs();
+            }
+        }
+
+        function clearInputs() {
+            document.getElementById('new-p1').value = '';
+            document.getElementById('new-p2').value = '';
+            document.getElementById('new-p1').focus();
+        }
+
+        function saveAndRefresh() {
+            saveToLocalStorage();
+            initApp();
+        }
+
+        function restoreDefaultDB() {
+            if (confirm("Czy na pewno chcesz przywrócić domyślną bazę roślin? Wszystkie Twoje ręcznie dodane zmiany zostaną bezpowrotnie usunięte.")) {
+                localStorage.removeItem('KombinacjeRoslin');
+                location.reload(); // Odświeża stronę, co automatycznie załaduje zmienną rawData
+            }
+        }
+
+        // ==========================================
+        // 4. OBSŁUGA PLIKÓW (JSON IMPORT / EXPORT)
+        // ==========================================
+
+        function saveToFile() {
+            const dataStr = JSON.stringify(appData, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "kombinacje_roslin_baza.json";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function loadFromFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (Array.isArray(parsed) && parsed.length > 0 && Array.isArray(parsed[0])) {
+                        appData = parsed;
+                        saveAndRefresh();
+                        alert("Baza roślin została pomyślnie załadowana i zaktualizowana!");
+                    } else {
+                        alert("Nieprawidłowy format pliku JSON. Upewnij się, że to plik zapisany przez tę aplikację.");
+                    }
+                } catch (err) {
+                    alert("Wystąpił błąd podczas czytania pliku JSON: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+            // Reset inputa, by można było wczytać ten sam plik ponownie
+            event.target.value = ''; 
+        }
+
+    </script>
+</body>
+</html>
